@@ -1,65 +1,68 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-<meta charset="UTF-8">
-<title>لوحة الإدارة - سيرفر الباحة</title>
-<style>
-body { font-family: Arial; background:#111; color:white; margin:0; padding:0; }
-.container { max-width:1000px; margin:0 auto; padding:20px; }
-form, .panel-section { background: rgba(0,0,0,0.85); padding:20px; border-radius:10px; margin-bottom:20px; }
-input, textarea, button { padding:10px; border-radius:5px; border:none; margin:5px 0; }
-button { background: cyan; color:black; font-weight:bold; cursor:pointer; }
-button:hover { background:#00ffffaa; }
-table { width:100%; border-collapse: collapse; margin-top:10px; }
-th, td { border:1px solid white; padding:5px; text-align:center; }
-h2 { border-bottom:2px solid cyan; padding-bottom:5px; margin-bottom:10px; }
-#adminPanel { display:none; }
-</style>
-</head>
-<body>
+<script>
+let adminName = "";
 
-<div class="container">
+loginForm.addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
 
-<!-- نموذج تسجيل الدخول -->
-<form id="loginForm">
-  <h2>تسجيل دخول المسؤول</h2>
-  <input type="email" name="email" placeholder="البريد الإلكتروني" required>
-  <input type="password" name="password" placeholder="كلمة المرور" required>
-  <button type="submit">تسجيل الدخول</button>
-</form>
+  const res = await fetch('/api/admin-login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ email, password })
+  });
+  const data = await res.json();
 
-<!-- لوحة التحكم بعد تسجيل الدخول -->
-<div id="adminPanel">
+  if(data.success){
+    adminName = data.adminName; // نخزن اسم الإداري
+    alert("تم تسجيل الدخول ✅ كـ " + adminName);
+    loginBox.style.display = "none";
+    adminPanel.style.display = "block";
+    loadCars();
+    loadLogs();
+  } else {
+    alert("❌ البريد أو كلمة المرور غير صحيحة");
+  }
+});
 
-  <h2>لوحة التحكم الكاملة</h2>
+// إرسال اسم الإداري مع كل عملية
+document.getElementById("addCarForm").addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  const formData = new FormData(e.target);
+  const res = await fetch('/api/cars', {
+    method: 'POST',
+    headers: { 'x-admin-name': adminName },
+    body: formData
+  });
+  if((await res.json()).success){
+    loadCars();
+    loadLogs();
+  }
+});
 
-  <!-- إدارة السيارات -->
-  <div class="panel-section">
-    <h3>إضافة سيارة جديدة</h3>
-    <form id="addCarForm" enctype="multipart/form-data">
-      <input type="text" name="title" placeholder="اسم السيارة" required>
-      <input type="text" name="description" placeholder="وصف السيارة" required>
-      <input type="text" name="specs" placeholder="المواصفات" required>
-      <input type="file" name="image" accept="image/*" required>
-      <button type="submit">إضافة السيارة</button>
-    </form>
+// حذف سيارة
+async function deleteCar(id){
+  if(confirm("هل تريد حذف السيارة؟")){
+    await fetch('/api/cars/'+id, { method:'DELETE', headers:{'x-admin-name': adminName} });
+    loadCars();
+    loadLogs();
+  }
+}
 
-    <h3>السيارات الحالية</h3>
-    <table id="carsTable">
-      <thead>
-        <tr>
-          <th>الاسم</th>
-          <th>الوصف</th>
-          <th>المواصفات</th>
-          <th>صورة</th>
-          <th>حذف</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
+// تحميل السجلات
+async function loadLogs(){
+  const res = await fetch('/api/logs');
+  const logs = await res.json();
+  let logText = "";
+  logs.slice().reverse().forEach(l=>{
+    logText += `[${l.time}] ${l.admin} - ${l.action} - ${l.details}\n`;
+  });
+  document.getElementById("logsBox").textContent = logText;
+}
+</script>
 
-  <!-- إدارة الحصريات -->
-  <div class="panel-section">
-    <h3>تعديل الحصريات</h3>
-    <textarea id="exclusiveText" rows="
+<!-- أسفل لوحة التحكم -->
+<div class="panel-section">
+  <h3>سجل الإداريين</h3>
+  <pre id="logsBox" style="background:#222; padding:10px; border-radius:5px; height:200px; overflow:auto;"></pre>
+</div>

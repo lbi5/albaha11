@@ -1,139 +1,122 @@
-const express = require('express');
-const cors = require('cors');
-const multer = require('multer');
-const fs = require('fs');
-const path = require('path');
+const express = require("express");
+const fs = require("fs");
+const path = require("path");
+const bodyParser = require("body-parser");
+const multer = require("multer");
+const { v4: uuidv4 } = require("uuid");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-app.use(express.static('public'));
+const PORT = 3000;
 
-// مجلد رفع الصور
-const upload = multer({ dest: 'uploads/' });
+// middlewares
+app.use(bodyParser.json());
+app.use(express.static(path.join(__dirname, "public")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
-// بيانات المسؤولين
+// ملفات التخزين
+const carsFile = path.join(__dirname, "data", "cars.json");
+const logsFile = path.join(__dirname, "data", "logs.json");
+
+// إدارة المستخدمين (إضافة ايميلاتك هنا)
 const admins = [
-  { email: "bn.rr332299@gmail.com", password: "1234", role: "admin" }
+  { email: "bn.rr332299@gmail.com", password: "1234", name: "عيسى السعد" },
+  { email: "issa@server.com", password: "1234", name: "تركي الشهري" },
+  { email: "ahmed@server.com", password: "1234", name: "أحمد الزهراني" },
+  { email: "turki@server.com", password: "1234", name: "طلال القحطاني" }
 ];
 
-// ملف بيانات الموقع
-const DATA_FILE = path.join(__dirname, 'data', 'siteData.json');
-
-// إنشاء ملف البيانات إذا لم يوجد
-if (!fs.existsSync(DATA_FILE)) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify({
-    products: [],
-    exclusive: 'هنا نص الحصريات',
-    rules: 'هنا نص القوانين',
-    designers: 'عيسى السعد | أحمد الزهراني | تركي الشهري',
-    discord: '',
-    emails: ''
-  }, null, 2));
+// تحميل/حفظ بيانات السيارات
+function loadCars() {
+  if (!fs.existsSync(carsFile)) return [];
+  return JSON.parse(fs.readFileSync(carsFile));
+}
+function saveCars(cars) {
+  fs.writeFileSync(carsFile, JSON.stringify(cars, null, 2));
 }
 
-// قراءة البيانات
-function readData() {
-  return JSON.parse(fs.readFileSync(DATA_FILE));
+// تحميل/حفظ السجلات
+function loadLogs() {
+  if (!fs.existsSync(logsFile)) return [];
+  return JSON.parse(fs.readFileSync(logsFile));
+}
+function saveLogs(logs) {
+  fs.writeFileSync(logsFile, JSON.stringify(logs, null, 2));
+}
+function addLog(action, adminName, details = "") {
+  const logs = loadLogs();
+  logs.push({
+    id: uuidv4(),
+    action,
+    admin: adminName,
+    details,
+    time: new Date().toLocaleString("ar-SA")
+  });
+  saveLogs(logs);
 }
 
-// حفظ البيانات
-function saveData(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
+// نظام رفع الصور
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, "uploads/"),
+  filename: (req, file, cb) => cb(null, Date.now() + path.extname(file.originalname))
+});
+const upload = multer({ storage });
 
-// تسجيل دخول الإدارة
-app.post('/api/admin-login', (req, res) => {
+// ✅ تسجيل دخول الإداري
+app.post("/api/admin-login", (req, res) => {
   const { email, password } = req.body;
   const admin = admins.find(a => a.email === email && a.password === password);
-  if (admin) res.json({ success: true, message: "تم تسجيل الدخول بنجاح!" });
-  else res.json({ success: false, message: "البريد أو كلمة المرور خاطئة!" });
-});
-
-// جلب السيارات
-app.get('/api/products', (req, res) => {
-  const data = readData();
-  res.json(data.products);
-});
-
-// إضافة سيارة
-app.post('/api/add-car', upload.single('image'), (req, res) => {
-  const data = readData();
-  const { title, description, specs } = req.body;
-  let imageUrl = '';
-  if (req.file) {
-    // نقل الصورة لمجلد public/images
-    const ext = path.extname(req.file.originalname);
-    const newPath = path.join(__dirname, 'public', 'images', req.file.filename + ext);
-    fs.renameSync(req.file.path, newPath);
-    imageUrl = `/images/${req.file.filename}${ext}`;
+  if (admin) {
+    addLog("تسجيل دخول", admin.name, `الإيميل: ${email}`);
+    res.json({ success: true, message: "تم تسجيل الدخول", adminName: admin.name });
+  } else {
+    res.json({ success: false, message: "البريد أو كلمة المرور غير صحيحة" });
   }
-  data.products.push({ title, description, specs, imageUrl });
-  saveData(data);
-  res.json({ success:true, message:"تمت إضافة السيارة!" });
 });
 
-// حذف سيارة
-app.delete('/api/delete-car/:index', (req,res)=>{
-  const idx = parseInt(req.params.index);
-  const data = readData();
-  if(idx>=0 && idx<data.products.length){
-    data.products.splice(idx,1);
-    saveData(data);
-    res.json({success:true,message:"تم حذف السيارة"});
-  } else res.json({success:false,message:"الفهرس غير صحيح"});
+// ✅ إحضار السيارات
+app.get("/api/cars", (req, res) => {
+  res.json(loadCars());
 });
 
-// جلب بيانات الموقع الأخرى
-app.get('/api/site-data', (req,res)=>{
-  const data = readData();
-  res.json({
-    exclusive: data.exclusive,
-    rules: data.rules,
-    designers: data.designers,
-    discord: data.discord,
-    emails: data.emails
-  });
+// ✅ إضافة سيارة
+app.post("/api/cars", upload.single("image"), (req, res) => {
+  const cars = loadCars();
+  const car = {
+    id: uuidv4(),
+    title: req.body.title,
+    description: req.body.description,
+    specs: req.body.specs,
+    image: "/uploads/" + req.file.filename
+  };
+  cars.push(car);
+  saveCars(cars);
+
+  const adminName = req.headers["x-admin-name"] || "غير معروف";
+  addLog("إضافة سيارة", adminName, `السيارة: ${car.title}`);
+
+  res.json({ success: true, car });
 });
 
-// تحديث الحصريات
-app.post('/api/update-exclusive', (req,res)=>{
-  const { exclusive } = req.body;
-  const data = readData();
-  data.exclusive = exclusive;
-  saveData(data);
-  res.json({success:true});
+// ✅ حذف سيارة
+app.delete("/api/cars/:id", (req, res) => {
+  let cars = loadCars();
+  const car = cars.find(c => c.id === req.params.id);
+  if (!car) return res.status(404).json({ success: false, message: "لم يتم العثور على السيارة" });
+
+  cars = cars.filter(c => c.id !== req.params.id);
+  saveCars(cars);
+
+  const adminName = req.headers["x-admin-name"] || "غير معروف";
+  addLog("حذف سيارة", adminName, `السيارة: ${car.title}`);
+
+  res.json({ success: true });
 });
 
-// تحديث القوانين
-app.post('/api/update-rules', (req,res)=>{
-  const { rules } = req.body;
-  const data = readData();
-  data.rules = rules;
-  saveData(data);
-  res.json({success:true});
+// ✅ إحضار السجلات
+app.get("/api/logs", (req, res) => {
+  res.json(loadLogs());
 });
 
-// تحديث المصممين
-app.post('/api/update-designers', (req,res)=>{
-  const { designers } = req.body;
-  const data = readData();
-  data.designers = designers;
-  saveData(data);
-  res.json({success:true});
-});
-
-// تحديث التواصل
-app.post('/api/update-contact', (req,res)=>{
-  const { discord, emails } = req.body;
-  const data = readData();
-  data.discord = discord;
-  data.emails = emails;
-  saveData(data);
-  res.json({success:true});
-});
-
-app.listen(3000, '0.0.0.0', () => {
-  console.log('Server running on http://0.0.0.0:3000');
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Server running on http://0.0.0.0:${PORT}`);
 });
