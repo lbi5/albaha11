@@ -15,7 +15,7 @@ const upload = multer({ dest: 'uploads/' });
 
 // بيانات المسؤولين
 const admins = [
-  { email: "admin@example.com", password: "1234", role: "admin" }
+  { email: "bn.rr332299@gmail.com", password: "1234", role: "admin" }
 ];
 
 // ملف بيانات الموقع
