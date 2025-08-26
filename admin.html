@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>تسجيل دخول الإدارة</title>
+<link rel="stylesheet" href="styles.css">
+<style>
+body { font-family: Arial; background: #111; color:white; display:flex; justify-content:center; align-items:center; height:100vh; }
+form { background: rgba(0,0,0,0.8); padding:30px; border-radius:10px; display:flex; flex-direction:column; gap:10px; }
+input, button { padding:10px; border-radius:5px; border:none; }
+button { background: cyan; color:black; font-weight:bold; cursor:pointer; }
+button:hover { background:#00ffffaa; }
+#adminPanel { display:none; margin-top:20px; }
+table { width:100%; border-collapse: collapse; margin-top:10px; }
+th, td { border:1px solid white; padding:5px; text-align:center; }
+</style>
+</head>
+<body>
+
+<form id="loginForm">
+  <h2>تسجيل دخول الإدارة</h2>
+  <input type="email" name="email" placeholder="البريد الإلكتروني" required>
+  <input type="password" name="password" placeholder="كلمة المرور" required>
+  <button type="submit">تسجيل الدخول</button>
+</form>
+
+<div id="adminPanel">
+  <h2>لوحة التحكم الكاملة</h2>
+
+  <form id="addCarForm" enctype="multipart/form-data">
+    <h3>إضافة سيارة جديدة</h3>
+    <input type="text" name="title" placeholder="اسم السيارة" required>
+    <input type="text" name="description" placeholder="وصف السيارة" required>
+    <input type="text" name="specs" placeholder="المواصفات" required>
+    <input type="file" name="image" accept="image/*" required>
+    <button type="submit">إضافة السيارة</button>
+  </form>
+
+  <h3>السيارات الحالية</h3>
+  <table id="carsTable">
+    <thead>
+      <tr>
+        <th>الاسم</th>
+        <th>الوصف</th>
+        <th>المواصفات</th>
+        <th>صورة</th>
+        <th>حذف</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<script>
+const loginForm = document.getElementById('loginForm');
+const adminPanel = document.getElementById('adminPanel');
+const addCarForm = document.getElementById('addCarForm');
+
+loginForm.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const email = loginForm.email.value;
+  const password = loginForm.password.value;
+
+  const res = await fetch('/api/admin-login', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({email,password})
+  });
+
+  const data = await res.json();
+  if(data.success){
+    alert(data.message);
+    loginForm.style.display = 'none';
+    adminPanel.style.display = 'block';
+    loadCars();
+  } else {
+    alert(data.message);
+  }
+});
+
+// إضافة سيارة
+addCarForm.addEventListener('submit', async e=>{
+  e.preventDefault();
+  const formData = new FormData(addCarForm);
+  const res = await fetch('/api/add-car', { method:'POST', body:formData });
+  const data = await res.json();
+  alert(data.message);
+  addCarForm.reset();
+  loadCars();
+});
+
+// عرض السيارات
+async function loadCars(){
+  const res = await fetch('/api/products');
+  const cars = await res.json();
+  const tbody = document.querySelector('#carsTable tbody');
+  tbody.innerHTML = '';
+  cars.forEach((car,index)=>{
+    tbody.innerHTML += `<tr>
+      <td>${car.title}</td>
+      <td>${car.description}</td>
+      <td>${car.specs}</td>
+      <td>${car.imageUrl ? `<img src="${car.imageUrl}" width="80">` : ''}</td>
+      <td><button onclick="deleteCar(${index})">حذف</button></td>
+    </tr>`;
+  });
+}
+
+// حذف سيارة
+async function deleteCar(index){
+  const res = await fetch(`/api/delete-car/${index}`, { method:'DELETE' });
+  const data = await res.json();
+  alert(data.message);
+  loadCars();
+}
+</script>
+
+</body>
+</html>
