@@ -110,6 +110,26 @@ document.getElementById('contactForm').addEventListener('submit', function(e){
   this.reset();
 });
 </script>
+<!-- قسم السجلات -->
+<section id="logs" style="padding:40px; background:#111; color:#fff; text-align:center;">
+  <h2>📜 سجل الإداريين</h2>
+  <pre id="logsBox" style="background:#000; padding:10px; border-radius:5px; height:200px; overflow:auto;"></pre>
+</section>
 
+<script>
+  // تحميل السجلات للزوار
+  async function loadLogs(){
+    const res = await fetch("/api/logs");
+    const logs = await res.json();
+    let logText = "";
+    logs.slice().reverse().forEach(l=>{
+      logText += `[${l.time}] ${l.admin} - ${l.action} - ${l.details}\n`;
+    });
+    document.getElementById("logsBox").textContent = logText;
+  }
+
+  loadLogs();
+  setInterval(loadLogs, 10000); // تحديث تلقائي كل 10 ثواني
+</script>
 </body>
 </html>

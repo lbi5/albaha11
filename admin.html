@@ -1,68 +1,159 @@
-<script>
-let adminName = "";
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>لوحة التحكم - سيرفر الباحة</title>
+  <style>
+    body {
+      margin:0; font-family:Tahoma; background:#111; color:#fff; text-align:center;
+    }
+    header { background:#222; padding:15px; font-size:20px; }
+    .login-box, .admin-panel {
+      margin:50px auto; background:#222; padding:20px; border-radius:10px; width:400px;
+    }
+    input, textarea {
+      width:90%; padding:8px; margin:8px; border:none; border-radius:5px;
+    }
+    button { padding:10px 15px; border:none; border-radius:5px; cursor:pointer; }
+    button:hover { opacity:0.8 }
+    .car-card {
+      background:#333; margin:10px; padding:10px; border-radius:8px; display:inline-block; width:220px;
+    }
+    img { width:100%; border-radius:5px; }
+    .panel-section { margin:30px auto; width:80%; }
+    pre { text-align:left; }
+  </style>
+</head>
+<body>
+  <header>🚗 لوحة التحكم</header>
 
-loginForm.addEventListener('submit', async (e)=>{
-  e.preventDefault();
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
+  <!-- صندوق تسجيل الدخول -->
+  <div class="login-box" id="loginBox">
+    <h2>تسجيل دخول الإدارة</h2>
+    <form id="loginForm">
+      <input type="email" id="email" placeholder="البريد الإلكتروني" required>
+      <input type="password" id="password" placeholder="كلمة المرور" required>
+      <button type="submit">تسجيل دخول</button>
+    </form>
+  </div>
 
-  const res = await fetch('/api/admin-login', {
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ email, password })
-  });
-  const data = await res.json();
+  <!-- لوحة التحكم -->
+  <div class="admin-panel" id="adminPanel" style="display:none;">
+    <h2>مرحباً <span id="adminName"></span> 👋</h2>
 
-  if(data.success){
-    adminName = data.adminName; // نخزن اسم الإداري
-    alert("تم تسجيل الدخول ✅ كـ " + adminName);
-    loginBox.style.display = "none";
-    adminPanel.style.display = "block";
-    loadCars();
-    loadLogs();
-  } else {
-    alert("❌ البريد أو كلمة المرور غير صحيحة");
-  }
-});
+    <!-- إضافة سيارة -->
+    <div class="panel-section">
+      <h3>➕ إضافة سيارة</h3>
+      <form id="addCarForm" enctype="multipart/form-data">
+        <input type="text" name="title" placeholder="اسم السيارة" required><br>
+        <textarea name="description" placeholder="الوصف" required></textarea><br>
+        <textarea name="specs" placeholder="المواصفات" required></textarea><br>
+        <input type="file" name="image" accept="image/*" required><br>
+        <button type="submit">إضافة</button>
+      </form>
+    </div>
 
-// إرسال اسم الإداري مع كل عملية
-document.getElementById("addCarForm").addEventListener("submit", async (e)=>{
-  e.preventDefault();
-  const formData = new FormData(e.target);
-  const res = await fetch('/api/cars', {
-    method: 'POST',
-    headers: { 'x-admin-name': adminName },
-    body: formData
-  });
-  if((await res.json()).success){
-    loadCars();
-    loadLogs();
-  }
-});
+    <!-- السيارات المضافة -->
+    <div class="panel-section">
+      <h3>🚙 السيارات</h3>
+      <div id="carsList"></div>
+    </div>
 
-// حذف سيارة
-async function deleteCar(id){
-  if(confirm("هل تريد حذف السيارة؟")){
-    await fetch('/api/cars/'+id, { method:'DELETE', headers:{'x-admin-name': adminName} });
-    loadCars();
-    loadLogs();
-  }
-}
+    <!-- السجلات -->
+    <div class="panel-section">
+      <h3>📜 سجل الإداريين</h3>
+      <pre id="logsBox" style="background:#000; padding:10px; border-radius:5px; height:200px; overflow:auto;"></pre>
+    </div>
+  </div>
 
-// تحميل السجلات
-async function loadLogs(){
-  const res = await fetch('/api/logs');
-  const logs = await res.json();
-  let logText = "";
-  logs.slice().reverse().forEach(l=>{
-    logText += `[${l.time}] ${l.admin} - ${l.action} - ${l.details}\n`;
-  });
-  document.getElementById("logsBox").textContent = logText;
-}
-</script>
+  <script>
+    let adminName = "";
 
-<!-- أسفل لوحة التحكم -->
-<div class="panel-section">
-  <h3>سجل الإداريين</h3>
-  <pre id="logsBox" style="background:#222; padding:10px; border-radius:5px; height:200px; overflow:auto;"></pre>
-</div>
+    // تسجيل الدخول
+    document.getElementById("loginForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch("/api/admin-login", {
+        method:"POST",
+        headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ email, password })
+      });
+      const data = await res.json();
+
+      if(data.success){
+        adminName = data.adminName;
+        document.getElementById("adminName").textContent = adminName;
+        document.getElementById("loginBox").style.display = "none";
+        document.getElementById("adminPanel").style.display = "block";
+        loadCars();
+        loadLogs();
+      } else {
+        alert("❌ البريد أو كلمة المرور غير صحيحة");
+      }
+    });
+
+    // إضافة سيارة
+    document.getElementById("addCarForm").addEventListener("submit", async (e)=>{
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const res = await fetch("/api/cars", {
+        method: "POST",
+        headers: { "x-admin-name": adminName },
+        body: formData
+      });
+      const data = await res.json();
+      if(data.success){
+        alert("✅ تمت إضافة السيارة");
+        loadCars();
+        loadLogs();
+        e.target.reset();
+      }
+    });
+
+    // تحميل السيارات
+    async function loadCars(){
+      const res = await fetch("/api/cars");
+      const cars = await res.json();
+      const carsList = document.getElementById("carsList");
+      carsList.innerHTML = "";
+      cars.forEach(c=>{
+        const div = document.createElement("div");
+        div.className = "car-card";
+        div.innerHTML = `
+          <img src="${c.image}" alt="">
+          <h4>${c.title}</h4>
+          <p>${c.description}</p>
+          <small>${c.specs}</small><br>
+          <button onclick="deleteCar('${c.id}')">🗑 حذف</button>
+        `;
+        carsList.appendChild(div);
+      });
+    }
+
+    // حذف سيارة
+    async function deleteCar(id){
+      if(confirm("هل تريد حذف السيارة؟")){
+        await fetch("/api/cars/"+id, {
+          method:"DELETE",
+          headers:{ "x-admin-name": adminName }
+        });
+        loadCars();
+        loadLogs();
+      }
+    }
+
+    // تحميل السجلات
+    async function loadLogs(){
+      const res = await fetch("/api/logs");
+      const logs = await res.json();
+      let logText = "";
+      logs.slice().reverse().forEach(l=>{
+        logText += `[${l.time}] ${l.admin} - ${l.action} - ${l.details}\n`;
+      });
+      document.getElementById("logsBox").textContent = logText;
+    }
+  </script>
+</body>
+</html>
